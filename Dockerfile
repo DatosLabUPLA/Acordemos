@@ -21,5 +21,3 @@ USER 10001:10001
 FROM nginx:stable-alpine AS proxy
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=wsgi /app/assets/ /srv/static/
-
-FROM application AS development

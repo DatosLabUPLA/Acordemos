@@ -1,32 +1,7 @@
 # Acordemos en Docker
 
-El entorno local conserva Python 3.5.10 y Django 1.11.7. Compose publica el
-servidor de desarrollo solo en http://127.0.0.1:8000 y desactiva el envío de
-correo. Para activar Google OAuth, define `GOOGLE_OAUTH2_KEY` con el ID de
-cliente y `GOOGLE_OAUTH2_SECRET` con el secreto del cliente en el `.env` local.
-Para probar con Google en local, registra también
-`http://127.0.0.1:8000/auth/google/callback` en el cliente de desarrollo.
-
-## Preparar una copia local
-
-1. Guarda una copia consistente de `GestorAcuerdos.sqlite3` y el directorio
-   `media/` en un directorio privado fuera del checkout. Usa una copia de
-   trabajo independiente del respaldo. El directorio debe permitir escritura
-   para que SQLite pueda crear sus archivos de transacción.
-2. Copia `.env.example` a `.env`. Configura `ACORDEMOS_STORAGE` con la ruta
-   al directorio anterior, usando barras `/` en Windows. Genera
-   `DJANGO_SECRET_KEY` con un generador de secretos y guárdala en `.env`.
-3. Desde la raíz del fork, ejecuta:
-
-   ```sh
-   docker compose up -d --build
-   docker compose exec web python manage.py check
-   ```
-
-Abre http://127.0.0.1:8000. Puedes detener el entorno con `docker compose down`.
-SQLite y los adjuntos quedan en el directorio del host montado en `/data`.
-La aplicación usa la base restaurada y el arranque comprueba que el archivo
-exista. Las migraciones se aplican de forma explícita después de revisarlas.
+Acordemos usa Python 3.5.10 y Django 1.11.7. El archivo `compose.yaml`
+define Gunicorn, Nginx y el almacenamiento persistente para Coolify.
 
 ## Desplegar en Coolify desde GitHub
 
@@ -43,15 +18,14 @@ exista. Las migraciones se aplican de forma explícita después de revisarlas.
    sudo chmod -R u=rwX,go=rX /srv/acordemos/data/media
    ```
 
-   Para un entorno de prueba en el mismo servidor, usa otra carpeta y configura
-   `ACORDEMOS_STORAGE` con esa ruta absoluta. Cada entorno debe tener su propia
-   copia de la base. Usa el bloque anterior para la carga inicial. Para el corte
-   final, detén las escrituras en origen y restaura el respaldo definitivo con
-   la aplicación de destino detenida.
+   Usa el bloque anterior para la carga inicial. Para el corte final, detén
+   las escrituras en origen y restaura el respaldo definitivo con la aplicación
+   de destino detenida.
 
 2. Sube los cambios al fork. En Coolify crea una aplicación desde el repositorio
    de GitHub y la rama que elegiste. Selecciona **Docker Compose**, con
-   **Base Directory** `/` y **Docker Compose Location** `/compose.coolify.yaml`.
+   **Base Directory** `/` y **Docker Compose Location** `/compose.yaml`.
+   Si ya creaste el recurso, ajusta la ruta, guarda y pulsa **Load Compose**.
 
 3. Define estas variables en Coolify:
 

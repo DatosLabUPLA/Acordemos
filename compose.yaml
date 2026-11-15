@@ -1,23 +1,59 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      target: proxy
+    expose:
+      - "8000"
+    depends_on:
+      django:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: /srv/acordemos/data/media
+        target: /srv/media
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+
+  django:
+    build:
+      context: .
+      target: wsgi
     environment:
       ACORDEMOS_DATA_DIR: /data
-      DJANGO_DEBUG: "1"
-      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?Define DJANGO_SECRET_KEY en .env}"
+      DJANGO_DEBUG: "0"
+      DJANGO_HTTPS_PROXY: "1"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:?}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?}"
       GOOGLE_OAUTH2_KEY: "${GOOGLE_OAUTH2_KEY:-}"
       GOOGLE_OAUTH2_SECRET: "${GOOGLE_OAUTH2_SECRET:-}"
+      DJANGO_EMAIL_BACKEND: "${DJANGO_EMAIL_BACKEND:-django.core.mail.backends.dummy.EmailBackend}"
+      EMAIL_HOST: "${EMAIL_HOST:-}"
+      EMAIL_PORT: "${EMAIL_PORT:-587}"
+      EMAIL_HOST_USER: "${EMAIL_HOST_USER:-}"
+      EMAIL_HOST_PASSWORD: "${EMAIL_HOST_PASSWORD:-}"
+      DEFAULT_FROM_EMAIL: "${DEFAULT_FROM_EMAIL:-}"
     command:
       - sh
       - -ec
       - |
-        test -s /data/GestorAcuerdos.sqlite3 || { echo 'Falta /data/GestorAcuerdos.sqlite3' >&2; exit 1; }
-        exec python manage.py runserver 0.0.0.0:8000 --noreload
-    ports:
-      - "127.0.0.1:${ACORDEMOS_PORT:-8000}:8000"
+        if ! test -s /data/GestorAcuerdos.sqlite3 || ! test -w /data/GestorAcuerdos.sqlite3 ||
+           ! test -w /data || ! test -w /data/media; then
+          echo 'Se requiere SQLite restaurado y /data y /data/media escribibles por UID 10001.' >&2
+          exit 1
+        fi
+        exec gunicorn --bind 0.0.0.0:8000 --workers 1 Acordemos.wsgi:application
     volumes:
       - type: bind
-        source: "${ACORDEMOS_STORAGE:?Define ACORDEMOS_STORAGE en .env}"
+        source: /srv/acordemos/data
         target: /data
         bind:
           create_host_path: false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
