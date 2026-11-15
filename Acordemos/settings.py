@@ -2,14 +2,22 @@ import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.environ.get('ACORDEMOS_DATA_DIR', os.path.join(BASE_DIR, 'data'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'g-b-oi&r#k#1e$$km1)+3eedljkzsdrtmb2#5w!5v@tg^&0)%n'
+SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG') == '1'
 
-ALLOWED_HOSTS = ["acordemos.datoslab.cl","142.93.206.11"]
+ALLOWED_HOSTS = os.environ.get(
+    'DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1'
+).split(',')
+
+if os.environ.get('DJANGO_HTTPS_PROXY') == '1':
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # Application definition
 INSTALLED_APPS = [ 'django.contrib.admin',
@@ -65,12 +73,7 @@ WSGI_APPLICATION = 'Acordemos.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/home/acordemos/acordemos/public_html/GestorAcuerdos.sqlite3',
-        'USER': 'root',
-        'PASSWORD:':'',
-        'HOST:':'',
-        'PORT:':'',
-
+        'NAME': os.path.join(DATA_DIR, 'GestorAcuerdos.sqlite3'),
     }
 }
 
@@ -111,7 +114,7 @@ USE_TZ = True
 AUTHENTICATION_BACKENDS = (
     'social_core.backends.open_id.OpenIdAuth',  # for Google authentication
     'social_core.backends.google.GoogleOpenId',  # for Google authentication
-    'social_core.backends.google.GoogleOAuth2',  # for Google authentication
+    'Acordemos.auth_backends.GoogleOAuth2Callback',
 
     'django.contrib.auth.backends.ModelBackend',
 )
@@ -123,27 +126,37 @@ LOGOUT_URL = 'logout'
 LOGIN_REDIRECT_URL = 'home'
 
 #ID del Cliente
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = '361785313928-ju8i0f53s741fvqhncplgaif9f4l5vjq.apps.googleusercontent.com'
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_OAUTH2_KEY', '')
 #Secreto de Cliente
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = 'Hi7FMN1GdVHygd7_z_IkA9EF'
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_OAUTH2_SECRET', '')
 
 #Direccion donde se almacenaran los archivos
-MEDIA_ROOT = '/home/acordemos/acordemos/public_html/static/media'
-MEDIA_URL = '\static/media/'
+MEDIA_ROOT = os.path.join(DATA_DIR, 'media')
+MEDIA_URL = '/static/media/'
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 
 # Static files (CSS, JavaScript, Images, Archivos en general)
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 STATICFILES_DIRS = [
+    ('media', MEDIA_ROOT),
     os.path.join(BASE_DIR, 'static'),
 ]
 STATIC_URL = '/static/'
 
-#Para mandar correo
+EMAIL_BACKEND = os.environ.get(
+    'DJANGO_EMAIL_BACKEND', 'django.core.mail.backends.dummy.EmailBackend'
+)
+
+# Para mandar correo
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_HOST_USER = 'acordemos.app@gmail.com'
-EMAIL_HOST_PASSWORD = 'acordemos1234'
+EMAIL_HOST = os.environ.get('EMAIL_HOST') or 'localhost'
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT') or '587')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = (
+    os.environ.get('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER or 'webmaster@localhost'
+)
 
 STATIC_ROOT = os.path.join(BASE_DIR,'assets/')

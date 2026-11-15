@@ -1,0 +1,83 @@
+# Acordemos en Docker
+
+El entorno local conserva Python 3.5.10 y Django 1.11.7. Compose publica el
+servidor de desarrollo solo en http://127.0.0.1:8000 y desactiva el envío de
+correo. Para activar Google OAuth, define `GOOGLE_OAUTH2_KEY` con el ID de
+cliente y `GOOGLE_OAUTH2_SECRET` con el secreto del cliente en el `.env` local.
+Para probar con Google en local, registra también
+`http://127.0.0.1:8000/auth/google/callback` en el cliente de desarrollo.
+
+## Preparar una copia local
+
+1. Guarda una copia consistente de `GestorAcuerdos.sqlite3` y el directorio
+   `media/` en un directorio privado fuera del checkout. Usa una copia de
+   trabajo independiente del respaldo. El directorio debe permitir escritura
+   para que SQLite pueda crear sus archivos de transacción.
+2. Copia `.env.example` a `.env`. Configura `ACORDEMOS_STORAGE` con la ruta
+   al directorio anterior, usando barras `/` en Windows. Genera
+   `DJANGO_SECRET_KEY` con un generador de secretos y guárdala en `.env`.
+3. Desde la raíz del fork, ejecuta:
+
+   ```sh
+   docker compose up -d --build
+   docker compose exec web python manage.py check
+   ```
+
+Abre http://127.0.0.1:8000. Puedes detener el entorno con `docker compose down`.
+SQLite y los adjuntos quedan en el directorio del host montado en `/data`.
+La aplicación usa la base restaurada y el arranque comprueba que el archivo
+exista. Las migraciones se aplican de forma explícita después de revisarlas.
+
+## Desplegar en Coolify desde GitHub
+
+1. Carga por SSH o SFTP una copia consistente de `GestorAcuerdos.sqlite3` y
+   `media/` en el servidor de destino. Desde el directorio que contiene ese
+   respaldo, prepara el montaje antes del primer despliegue:
+
+   ```sh
+   sudo install -d -m 0700 -o 10001 -g 10001 /srv/acordemos/data
+   sudo install -d -m 0755 -o 10001 -g 10001 /srv/acordemos/data/media
+   sudo install -m 0600 -o 10001 -g 10001 GestorAcuerdos.sqlite3 /srv/acordemos/data/
+   sudo cp -a media/. /srv/acordemos/data/media/
+   sudo chown -R 10001:10001 /srv/acordemos/data/media
+   sudo chmod -R u=rwX,go=rX /srv/acordemos/data/media
+   ```
+
+   Para un entorno de prueba en el mismo servidor, usa otra carpeta y configura
+   `ACORDEMOS_STORAGE` con esa ruta absoluta. Cada entorno debe tener su propia
+   copia de la base. Usa el bloque anterior para la carga inicial. Para el corte
+   final, detén las escrituras en origen y restaura el respaldo definitivo con
+   la aplicación de destino detenida.
+
+2. Sube los cambios al fork. En Coolify crea una aplicación desde el repositorio
+   de GitHub y la rama que elegiste. Selecciona **Docker Compose**, con
+   **Base Directory** `/` y **Docker Compose Location** `/compose.coolify.yaml`.
+
+3. Define estas variables en Coolify:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `DJANGO_SECRET_KEY` | Una clave aleatoria persistente para este entorno. |
+   | `DJANGO_ALLOWED_HOSTS` | Nombre del dominio sin esquema ni puerto. Para varios dominios, sepáralos por comas sin espacios. |
+   | `GOOGLE_OAUTH2_KEY` y `GOOGLE_OAUTH2_SECRET` | ID y secreto del cliente OAuth. En Google Cloud registra `https://acordemos.datoslab.cl/auth/google/callback` como URI de redireccionamiento autorizada, sin barra final. |
+   | `DJANGO_EMAIL_BACKEND` | Usa `django.core.mail.backends.smtp.EmailBackend` para habilitar correo. Por defecto el correo se descarta. |
+   | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Configuración SMTP si habilitas correo. El puerto por defecto es 587 con STARTTLS. |
+
+4. Asigna el dominio HTTPS al servicio **web**, con puerto interno **8000**. El
+   proxy de Coolify usa su entrada HTTPS habitual. Compose no publica un
+   puerto del host, por lo que otras aplicaciones pueden usar su propio
+   puerto interno 8000. Gunicorn atiende en `django` y Nginx sirve estáticos y
+   adjuntos bajo las rutas que usa el proyecto.
+
+5. Despliega y prueba el acceso, los adjuntos y una escritura controlada.
+   Reconstruye y comprueba que el dato siga presente. Cada despliegue monta
+   el mismo directorio. Las migraciones se ejecutan por separado, después de
+   revisar el plan y respaldar la base.
+
+Mantén un respaldo consistente de SQLite y una copia de los adjuntos fuera del
+servidor de Coolify. La aplicación usa un solo worker de Gunicorn para reducir
+la contención de SQLite. Despliega una sola réplica de Django por directorio de
+datos.
+
+El SQLite y `Administrador.txt` del fork se retiran del árbol actual. Las
+revisiones anteriores conservan el contenido que ya había sido publicado.

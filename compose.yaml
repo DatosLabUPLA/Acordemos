@@ -1,0 +1,23 @@
+services:
+  web:
+    build: .
+    environment:
+      ACORDEMOS_DATA_DIR: /data
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?Define DJANGO_SECRET_KEY en .env}"
+      GOOGLE_OAUTH2_KEY: "${GOOGLE_OAUTH2_KEY:-}"
+      GOOGLE_OAUTH2_SECRET: "${GOOGLE_OAUTH2_SECRET:-}"
+    command:
+      - sh
+      - -ec
+      - |
+        test -s /data/GestorAcuerdos.sqlite3 || { echo 'Falta /data/GestorAcuerdos.sqlite3' >&2; exit 1; }
+        exec python manage.py runserver 0.0.0.0:8000 --noreload
+    ports:
+      - "127.0.0.1:${ACORDEMOS_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: "${ACORDEMOS_STORAGE:?Define ACORDEMOS_STORAGE en .env}"
+        target: /data
+        bind:
+          create_host_path: false

@@ -1,5 +1,6 @@
 from django.conf.urls import url, include
 from django.contrib import admin
+from social_django.views import complete as social_complete
 #VISTAS Inicio de sesion
 from django.contrib.auth import views as auth_views
 from Apps.Acordemos.views import salir
@@ -23,6 +24,8 @@ urlpatterns = [
     url(r'^logout/$', auth_views.logout, name='logout'),
     url(r'^salir/$', salir, name='salir'),
     url(r'^login/$', auth_views.login, name='login'),
+    url(r'^auth/google/callback$', social_complete,
+        {'backend': 'google-oauth2'}, name='google-oauth-callback'),
     url(r'^auth/', include('social_django.urls', namespace='social')),
     #INICIO
     url(r'^$', infoBase, name='home'),
