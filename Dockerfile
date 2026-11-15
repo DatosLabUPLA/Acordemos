@@ -16,7 +16,6 @@ RUN python -m pip install --no-cache-dir --only-binary=:all: gunicorn==20.1.0 \
     && DJANGO_SECRET_KEY=collectstatic-build-only ACORDEMOS_DATA_DIR=/tmp/acordemos-build \
         python manage.py collectstatic --noinput \
     && rmdir /tmp/acordemos-build/media /tmp/acordemos-build
-USER 10001:10001
 
 FROM nginx:stable-alpine AS proxy
 COPY nginx.conf /etc/nginx/conf.d/default.conf

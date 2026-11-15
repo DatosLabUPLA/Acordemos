@@ -9,12 +9,7 @@ services:
       django:
         condition: service_healthy
     volumes:
-      - type: bind
-        source: /srv/acordemos/data/media
-        target: /srv/media
-        read_only: true
-        bind:
-          create_host_path: false
+      - acordemos-data:/srv/data:ro
     restart: unless-stopped
 
   django:
@@ -39,21 +34,25 @@ services:
       - sh
       - -ec
       - |
-        if ! test -s /data/GestorAcuerdos.sqlite3 || ! test -w /data/GestorAcuerdos.sqlite3 ||
-           ! test -w /data || ! test -w /data/media; then
-          echo 'Se requiere SQLite restaurado y /data y /data/media escribibles por UID 10001.' >&2
-          exit 1
+        install -d -m 0755 -o 10001 -g 10001 /data /data/media
+        install -d -m 0700 -o 10001 -g 10001 /data/import
+        if [ ! -e /data/GestorAcuerdos.sqlite3 ] && [ -s /data/import/GestorAcuerdos.sqlite3 ]; then
+          chown 10001:10001 /data/import/GestorAcuerdos.sqlite3
+          chmod 600 /data/import/GestorAcuerdos.sqlite3
+          mv /data/import/GestorAcuerdos.sqlite3 /data/GestorAcuerdos.sqlite3
         fi
-        exec gunicorn --bind 0.0.0.0:8000 --workers 1 Acordemos.wsgi:application
+        chown -R 10001:10001 /data/media
+        chmod -R u=rwX,go=rX /data/media
+        exec setpriv --reuid=10001 --regid=10001 --clear-groups \
+          gunicorn --bind 0.0.0.0:8000 --workers 1 Acordemos.wsgi:application
     volumes:
-      - type: bind
-        source: /srv/acordemos/data
-        target: /data
-        bind:
-          create_host_path: false
+      - acordemos-data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 2).close()"]
       interval: 5s
       timeout: 3s
       retries: 6
     restart: unless-stopped
+
+volumes:
+  acordemos-data:

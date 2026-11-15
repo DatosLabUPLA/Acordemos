@@ -5,29 +5,12 @@ define Gunicorn, Nginx y el almacenamiento persistente para Coolify.
 
 ## Desplegar en Coolify desde GitHub
 
-1. Carga por SSH o SFTP una copia consistente de `GestorAcuerdos.sqlite3` y
-   `media/` en el servidor de destino. Desde el directorio que contiene ese
-   respaldo, prepara el montaje antes del primer despliegue:
-
-   ```sh
-   sudo install -d -m 0700 -o 10001 -g 10001 /srv/acordemos/data
-   sudo install -d -m 0755 -o 10001 -g 10001 /srv/acordemos/data/media
-   sudo install -m 0600 -o 10001 -g 10001 GestorAcuerdos.sqlite3 /srv/acordemos/data/
-   sudo cp -a media/. /srv/acordemos/data/media/
-   sudo chown -R 10001:10001 /srv/acordemos/data/media
-   sudo chmod -R u=rwX,go=rX /srv/acordemos/data/media
-   ```
-
-   Usa el bloque anterior para la carga inicial. Para el corte final, detén
-   las escrituras en origen y restaura el respaldo definitivo con la aplicación
-   de destino detenida.
-
-2. Sube los cambios al fork. En Coolify crea una aplicación desde el repositorio
+1. Sube los cambios al fork. En Coolify crea una aplicación desde el repositorio
    de GitHub y la rama que elegiste. Selecciona **Docker Compose**, con
    **Base Directory** `/` y **Docker Compose Location** `/compose.yaml`.
    Si ya creaste el recurso, ajusta la ruta, guarda y pulsa **Load Compose**.
 
-3. Define estas variables en Coolify:
+2. Define estas variables en Coolify:
 
    | Variable | Valor |
    | --- | --- |
@@ -37,16 +20,29 @@ define Gunicorn, Nginx y el almacenamiento persistente para Coolify.
    | `DJANGO_EMAIL_BACKEND` | Usa `django.core.mail.backends.smtp.EmailBackend` para habilitar correo. Por defecto el correo se descarta. |
    | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Configuración SMTP si habilitas correo. El puerto por defecto es 587 con STARTTLS. |
 
-4. Asigna el dominio HTTPS al servicio **web**, con puerto interno **8000**. El
+3. Asigna el dominio HTTPS al servicio **web**, con puerto interno **8000**. El
    proxy de Coolify usa su entrada HTTPS habitual. Compose no publica un
    puerto del host, por lo que otras aplicaciones pueden usar su propio
    puerto interno 8000. Gunicorn atiende en `django` y Nginx sirve estáticos y
    adjuntos bajo las rutas que usa el proyecto.
 
-5. Despliega y prueba el acceso, los adjuntos y una escritura controlada.
-   Reconstruye y comprueba que el dato siga presente. Cada despliegue monta
-   el mismo directorio. Las migraciones se ejecutan por separado, después de
-   revisar el plan y respaldar la base.
+4. Despliega. Docker crea el volumen `acordemos-data`. Si falta SQLite, la
+   página muestra un aviso y el servicio `django` sigue disponible en **Files**.
+5. Abre **Acordemos → Files → django → /data/import**. Sube un respaldo
+   consistente con el nombre exacto `GestorAcuerdos.sqlite3`. Para los adjuntos,
+   sube el contenido de `media/` a `/data/media/` conservando sus subcarpetas.
+6. Pulsa **Redeploy**. El arranque prepara los permisos y mueve el respaldo a
+   `/data/GestorAcuerdos.sqlite3` si todavía falta la base activa. Comprueba que
+   la portada, el acceso y los adjuntos funcionen.
+
+La carpeta `/data/import` es para la primera carga. Un respaldo que se suba
+ahí después no sobrescribe la base activa. Las migraciones se ejecutan por
+separado, después de revisar el plan y respaldar la base.
+
+El volumen existe fuera de los contenedores y se reutiliza en cada redeploy
+del mismo recurso de Coolify. Conserva el recurso y su volumen. Si venías de
+la versión con `/srv/acordemos/data`, sube al volumen una copia consistente
+de esa base si está disponible. En caso contrario, usa el último respaldo.
 
 Mantén un respaldo consistente de SQLite y una copia de los adjuntos fuera del
 servidor de Coolify. La aplicación usa un solo worker de Gunicorn para reducir
